@@ -52,7 +52,7 @@ def _validate_bot_token(token):
         )
 
 
-ENV = _env_bool("ENV", False)
+ENV = _env_bool("ENV", False) or bool(os.environ.get("TOKEN", "").strip())
 
 if ENV:
 
