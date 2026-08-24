@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*.log
+log.txt
+.env
+env/
+venv/
+.venv/
+.python-version
+*.session
+*.session-journal
+*.sqlite3

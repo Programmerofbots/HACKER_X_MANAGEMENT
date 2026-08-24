@@ -1,0 +1,39 @@
+services:
+  - type: worker
+    name: hacker-x-management
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m FallenRobot
+    envVars:
+      - key: ENV
+        value: "True"
+      - key: API_ID
+        sync: false
+      - key: API_HASH
+        sync: false
+      - key: TOKEN
+        sync: false
+      - key: OWNER_ID
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: MONGO_DB_URI
+        sync: false
+      - key: EVENT_LOGS
+        sync: false
+      - key: SUPPORT_CHAT
+        sync: false
+      - key: START_IMG
+        value: https://telegra.ph/file/40eb1ed850cdea274693e.jpg
+      - key: ALLOW_CHATS
+        value: "True"
+      - key: ALLOW_EXCL
+        value: "True"
+      - key: DEL_CMDS
+        value: "True"
+      - key: INFOPIC
+        value: "True"
+      - key: STRICT_GBAN
+        value: "True"
+      - key: WORKERS
+        value: "8"
