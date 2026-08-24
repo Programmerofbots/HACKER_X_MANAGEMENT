@@ -75,7 +75,6 @@ if ENV:
     SUPPORT_CHAT = os.environ.get("SUPPORT_CHAT", "Princes_log_support_group")
     TEMP_DOWNLOAD_DIRECTORY = os.environ.get("TEMP_DOWNLOAD_DIRECTORY", "./")
     TOKEN = _env_required("TOKEN")
-    _validate_bot_token(TOKEN)
     TIME_API_KEY = os.environ.get("TIME_API_KEY", None)
     WORKERS = int(os.environ.get("WORKERS", 8))
 
@@ -163,6 +162,14 @@ else:
         WOLVES = set(int(x) for x in Config.WOLVES or [])
     except ValueError:
         raise Exception("Your whitelisted users list does not contain valid integers.")
+
+
+if not TOKEN:
+    raise RuntimeError(
+        "TOKEN is empty. On Render, set ENV=True and add the BotFather token "
+        "in the TOKEN environment variable."
+    )
+_validate_bot_token(TOKEN)
 
 
 DRAGONS.add(OWNER_ID)
