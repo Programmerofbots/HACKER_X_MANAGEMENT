@@ -134,10 +134,26 @@ def chatbot(update: Update, context: CallbackContext):
             return
         bot.send_chat_action(chat_id, action="typing")
         url = f"https://kora-api.vercel.app/chatbot/2d94e37d-937f-4d28-9196-bd5552cac68b/{BOT_NAME}/Anonymous/message={message.text}"
-        request = requests.get(url)
-        results = json.loads(request.text)
-        sleep(0.5)
-        message.reply_text(results["reply"])
+        try:
+            request = requests.get(url, timeout=10)
+            request.raise_for_status()
+            if not request.text:
+                raise ValueError("empty chatbot response")
+
+            try:
+                results = request.json()
+            except ValueError:
+                results = {"reply": "I’m currently unable to respond. Please try again in a moment."}
+
+            reply = results.get("reply") if isinstance(results, dict) else None
+            if not reply or not isinstance(reply, str):
+                raise ValueError("invalid chatbot response")
+
+            sleep(0.5)
+            message.reply_text(reply)
+        except (requests.RequestException, ValueError, TypeError):
+            sleep(0.5)
+            message.reply_text("I’m having trouble replying right now. Please try again in a moment.")
 
 
 __help__ = f"""
