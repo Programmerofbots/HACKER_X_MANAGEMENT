@@ -1,7 +1,8 @@
 import html
 import json
 import re
-from time import sleep
+from typing import Optional
+from urllib.parse import quote
 
 import requests
 from telegram import (
@@ -133,7 +134,11 @@ def chatbot(update: Update, context: CallbackContext):
         if not fallen_message(context, message):
             return
         bot.send_chat_action(chat_id, action="typing")
-        url = f"https://kora-api.vercel.app/chatbot/2d94e37d-937f-4d28-9196-bd5552cac68b/{BOT_NAME}/Anonymous/message={message.text}"
+        url = (
+            "https://kora-api.vercel.app/chatbot/"
+            f"2d94e37d-937f-4d28-9196-bd5552cac68b/{quote(BOT_NAME)}/Anonymous/"
+            f"message={quote(message.text)}"
+        )
         try:
             request = requests.get(url, timeout=10)
             request.raise_for_status()
@@ -143,16 +148,16 @@ def chatbot(update: Update, context: CallbackContext):
             try:
                 results = request.json()
             except ValueError:
-                results = {"reply": "I’m currently unable to respond. Please try again in a moment."}
+                results = {}
 
-            reply = results.get("reply") if isinstance(results, dict) else None
+            reply = None
+            if isinstance(results, dict):
+                reply = results.get("reply") or results.get("response")
             if not reply or not isinstance(reply, str):
                 raise ValueError("invalid chatbot response")
 
-            sleep(0.5)
             message.reply_text(reply)
-        except (requests.RequestException, ValueError, TypeError):
-            sleep(0.5)
+        except (requests.RequestException, ValueError, TypeError, KeyError):
             message.reply_text("I’m having trouble replying right now. Please try again in a moment.")
 
 
