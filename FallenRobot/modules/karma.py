@@ -126,7 +126,7 @@ async def karma(_, message):
             if limit > 9:
                 break
             try:
-                user = await app.get_users(int(user_idd))
+                user = await pbot.get_users(int(user_idd))
                 await asyncio.sleep(0.8)
             except Exception:
                 continue

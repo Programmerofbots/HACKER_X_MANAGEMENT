@@ -63,13 +63,9 @@ async def drawText(image_path, text):
 
     i_width, i_height = img.size
 
-    if os.name == "nt":
-
-        fnt = "ariel.ttf"
-
-    else:
-
-        fnt = "./FallenRobot/resources/default.ttf"
+    fnt = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)), "resources", "default.ttf"
+    )
 
     m_font = ImageFont.truetype(fnt, int((70 / 640) * i_width))
 

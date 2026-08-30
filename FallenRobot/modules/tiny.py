@@ -15,14 +15,20 @@ async def _(event):
         return
     kontol = await event.reply("`Processing tiny...`")
     ik = await tbot.download_media(reply)
-    im1 = Image.open("FallenRobot/resources/blank_background.png")
+    background_path = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)),
+        "resources",
+        "blank_background.png",
+    )
+    im1 = Image.open(background_path)
     if ik.endswith(".tgs"):
         await tbot.download_media(reply, "blank_background.tgs")
         os.system("lottie_convert.py blank_background.tgs json.json")
-        json = open("json.json", "r")
-        jsn = json.read()
+        with open("json.json", "r") as json_file:
+            jsn = json_file.read()
         jsn = jsn.replace("512", "2000")
-        ("json.json", "w").write(jsn)
+        with open("json.json", "w") as json_file:
+            json_file.write(jsn)
         os.system("lottie_convert.py json.json blank_background.tgs")
         file = "blank_background.tgs"
         os.remove("json.json")

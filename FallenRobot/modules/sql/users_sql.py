@@ -69,9 +69,10 @@ class ChatMembers(BASE):
         )
 
 
-Users.__table__.create(checkfirst=True)
-Chats.__table__.create(checkfirst=True)
-ChatMembers.__table__.create(checkfirst=True)
+if SESSION is not None:
+    Users.__table__.create(checkfirst=True)
+    Chats.__table__.create(checkfirst=True)
+    ChatMembers.__table__.create(checkfirst=True)
 
 INSERTION_LOCK = threading.RLock()
 

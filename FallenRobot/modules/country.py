@@ -14,8 +14,9 @@ async def msg(event):
     country = CountryInfo(lol)
     try:
         a = country.info()
-    except:
+    except Exception:
         await event.reply("Country Not Available Currently")
+        return
     name = a.get("name")
     bb = a.get("altSpellings")
     hu = ""
