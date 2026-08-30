@@ -3,7 +3,8 @@ import asyncio
 from datetime import datetime
 
 from PIL import Image
-from telegraph import Telegraph, upload_file
+import requests
+from telegraph import Telegraph
 
 from FallenRobot import LOGGER, telethn as tbot
 from FallenRobot.events import register
@@ -23,14 +24,21 @@ def _telegraph_url(path):
 
 def _safe_telegraph_upload(file_path):
     try:
-        result = upload_file(file_path)
+        with open(file_path, "rb") as media_file:
+            response = requests.post(
+                "https://telegra.ph/upload",
+                files={"file": media_file},
+                timeout=60,
+            )
+        response.raise_for_status()
+        result = response.json()
     except Exception as exc:
         LOGGER.warning("Telegraph upload failed: %s", exc)
         raise
 
     if isinstance(result, dict):
         if "error" in result:
-            raise RuntimeError(result.get("error", "Telegraph upload failed"))
+            raise RuntimeError(str(result["error"]))
         if "src" in result:
             return _telegraph_url(result["src"])
         if "url" in result:
@@ -53,7 +61,7 @@ def _safe_telegraph_upload(file_path):
 
 def _safe_telegraph_upload_result(result):
     if "error" in result:
-        raise RuntimeError(result.get("error", "Telegraph upload failed"))
+        raise RuntimeError(str(result["error"]))
     if "src" in result:
         return _telegraph_url(result["src"])
     if "url" in result:
