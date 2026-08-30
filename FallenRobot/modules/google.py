@@ -12,7 +12,7 @@ from bs4 import BeautifulSoup
 from PIL import Image
 from search_engine_parser import GoogleSearch
 
-from FallenRobot import telethn as tbot
+from FallenRobot import LOGGER, telethn as tbot
 from FallenRobot.events import register
 
 opener = urllib.request.build_opener()
@@ -36,16 +36,30 @@ async def _(event):
         page = 1
     search_args = (str(match), int(page))
     gsearch = GoogleSearch()
-    gresults = await gsearch.async_search(*search_args)
+    try:
+        gresults = await gsearch.async_search(*search_args)
+    except Exception as exc:
+        LOGGER.warning("Google search failed: %s", exc)
+        await webevent.edit(
+            "Google search is not available right now. Please try a different query later."
+        )
+        return
+
+    links = gresults.get("links", []) if isinstance(gresults, dict) else []
+    titles = gresults.get("titles", []) if isinstance(gresults, dict) else []
+    descriptions = gresults.get("descriptions", []) if isinstance(gresults, dict) else []
+
+    if not links:
+        await webevent.edit("No results found for this query.")
+        return
+
     msg = ""
-    for i in range(len(gresults["links"])):
-        try:
-            title = gresults["titles"][i]
-            link = gresults["links"][i]
-            desc = gresults["descriptions"][i]
-            msg += f"❍[{title}]({link})\n**{desc}**\n\n"
-        except IndexError:
-            break
+    for i in range(min(len(links), len(titles), len(descriptions))):
+        title = titles[i]
+        link = links[i]
+        desc = descriptions[i]
+        msg += f"❍[{title}]({link})\n**{desc}**\n\n"
+
     await webevent.edit(
         "**Search Query:**\n`" + match + "`\n\n**Results:**\n" + msg, link_preview=False
     )

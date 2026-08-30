@@ -4,7 +4,7 @@ from datetime import datetime
 from PIL import Image
 from telegraph import Telegraph, exceptions, upload_file
 
-from FallenRobot import telethn as tbot
+from FallenRobot import LOGGER, telethn as tbot
 from FallenRobot.events import register
 
 Anonymous = "Fallen"
@@ -12,6 +12,30 @@ TMP_DOWNLOAD_DIRECTORY = "./"
 telegraph = Telegraph()
 r = telegraph.create_account(short_name=Anonymous)
 auth_url = r["auth_url"]
+
+
+def _safe_telegraph_upload(file_path):
+    try:
+        result = upload_file(file_path)
+    except Exception as exc:
+        LOGGER.warning("Telegraph upload failed: %s", exc)
+        raise
+
+    if isinstance(result, dict):
+        if "error" in result:
+            raise RuntimeError(result.get("error", "Telegraph upload failed"))
+        if "src" in result:
+            return [result["src"]]
+        if "url" in result:
+            return [result["url"]]
+
+    if isinstance(result, str):
+        return [result]
+
+    if isinstance(result, (list, tuple)):
+        return list(result)
+
+    raise RuntimeError("Telegraph upload returned an unexpected response format")
 
 
 @register(pattern="^/tg(m|t) ?(.*)")
@@ -36,16 +60,19 @@ async def _(event):
                 resize_image(downloaded_file_name)
             try:
                 start = datetime.now()
-                media_urls = upload_file(downloaded_file_name)
-            except exceptions.TelegraphException as exc:
-                await h.edit("ERROR: " + str(exc))
-                os.remove(downloaded_file_name)
+                media_urls = _safe_telegraph_upload(downloaded_file_name)
+            except Exception as exc:
+                LOGGER.warning("Telegraph file upload failed: %s", exc)
+                await h.edit("ERROR: Telegraph upload failed right now. Try again later.")
+                if os.path.exists(downloaded_file_name):
+                    os.remove(downloaded_file_name)
             else:
                 end = datetime.now()
                 (end - start).seconds
-                os.remove(downloaded_file_name)
+                if os.path.exists(downloaded_file_name):
+                    os.remove(downloaded_file_name)
                 await h.edit(
-                    "Uploaded to https://te.legra.ph{})".format(media_urls[0]),
+                    "Uploaded to {}".format(media_urls[0]),
                     link_preview=True,
                 )
         elif input_str == "t":
