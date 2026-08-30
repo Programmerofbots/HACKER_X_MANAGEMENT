@@ -4,9 +4,10 @@ import re
 import sys
 import threading
 import time
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import telegram.ext as tg
-from aiohttp import ClientSession, web
+from aiohttp import ClientSession
 from pyrogram import Client, errors
 from telethon import TelegramClient
 
@@ -195,12 +196,18 @@ aiohttpsession = ClientSession()
 def _start_health_server():
     port = int(os.environ.get("PORT", 10000))
 
-    async def healthcheck(request):
-        return web.Response(text="ok", status=200)
+    class HealthHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"ok")
 
-    app = web.Application()
-    app.router.add_get("/", healthcheck)
-    web.run_app(app, host="0.0.0.0", port=port)
+        def log_message(self, format, *args):
+            return
+
+    server = HTTPServer(("0.0.0.0", port), HealthHandler)
+    server.serve_forever()
 
 
 if os.environ.get("RENDER") or os.environ.get("PORT"):
