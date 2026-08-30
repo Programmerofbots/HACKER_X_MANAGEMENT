@@ -13,11 +13,14 @@ class FallenChats(BASE):
         self.chat_id = chat_id
 
 
-FallenChats.__table__.create(checkfirst=True)
+if SESSION is not None:
+    FallenChats.__table__.create(checkfirst=True)
 INSERTION_LOCK = threading.RLock()
 
 
 def is_fallen(chat_id):
+    if SESSION is None:
+        return False
     try:
         chat = SESSION.query(FallenChats).get(str(chat_id))
         return bool(chat)
@@ -26,6 +29,8 @@ def is_fallen(chat_id):
 
 
 def set_fallen(chat_id):
+    if SESSION is None:
+        return
     with INSERTION_LOCK:
         fallenchat = SESSION.query(FallenChats).get(str(chat_id))
         if not fallenchat:
@@ -35,6 +40,8 @@ def set_fallen(chat_id):
 
 
 def rem_fallen(chat_id):
+    if SESSION is None:
+        return
     with INSERTION_LOCK:
         fallenchat = SESSION.query(FallenChats).get(str(chat_id))
         if fallenchat:
