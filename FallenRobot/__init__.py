@@ -2,10 +2,11 @@ import logging
 import os
 import re
 import sys
+import threading
 import time
 
 import telegram.ext as tg
-from aiohttp import ClientSession
+from aiohttp import ClientSession, web
 from pyrogram import Client, errors
 from telethon import TelegramClient
 
@@ -189,6 +190,22 @@ telethn = TelegramClient("Fallen", API_ID, API_HASH)
 pbot = Client("FallenRobot", api_id=API_ID, api_hash=API_HASH, bot_token=TOKEN)
 dispatcher = updater.dispatcher
 aiohttpsession = ClientSession()
+
+
+def _start_health_server():
+    port = int(os.environ.get("PORT", 10000))
+
+    async def healthcheck(request):
+        return web.Response(text="ok", status=200)
+
+    app = web.Application()
+    app.router.add_get("/", healthcheck)
+    web.run_app(app, host="0.0.0.0", port=port)
+
+
+if os.environ.get("RENDER") or os.environ.get("PORT"):
+    health_thread = threading.Thread(target=_start_health_server, daemon=True)
+    health_thread.start()
 
 print("[INFO]: Getting Bot Info...")
 BOT_ID = dispatcher.bot.id
