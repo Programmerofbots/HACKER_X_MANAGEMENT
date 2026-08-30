@@ -18,6 +18,7 @@ from telegram.error import (
     TimedOut,
     Unauthorized,
 )
+from telethon.errors import FloodWaitError
 from telegram.ext import (
     CallbackContext,
     CallbackQueryHandler,
@@ -772,7 +773,9 @@ def main():
     LOGGER.info("Using long polling.")
     updater.start_polling(timeout=15, read_latency=4, clean=True)
 
-    if len(argv) not in (1, 3, 4):
+    if not TELETHON_READY:
+        LOGGER.warning("Telethon is not authorized; Telethon features are disabled.")
+    elif len(argv) not in (1, 3, 4):
         telethn.disconnect()
     else:
         telethn.run_until_disconnected()
@@ -782,6 +785,14 @@ def main():
 
 if __name__ == "__main__":
     LOGGER.info("Successfully loaded modules: " + str(ALL_MODULES))
-    telethn.start(bot_token=TOKEN)
+    TELETHON_READY = False
+    try:
+        telethn.start(bot_token=TOKEN)
+        TELETHON_READY = True
+    except FloodWaitError as exc:
+        LOGGER.error(
+            "Telethon authorization is rate-limited for %s seconds; continuing without Telethon.",
+            exc.seconds,
+        )
     pbot.start()
     main()
