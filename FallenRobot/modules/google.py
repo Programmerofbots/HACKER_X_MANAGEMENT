@@ -1,3 +1,4 @@
+import asyncio
 import glob
 import io
 import os
@@ -10,7 +11,6 @@ import requests
 from bing_image_downloader import downloader
 from bs4 import BeautifulSoup
 from PIL import Image
-from search_engine_parser import GoogleSearch
 
 from FallenRobot import LOGGER, telethn as tbot
 from FallenRobot.events import register
@@ -18,6 +18,38 @@ from FallenRobot.events import register
 opener = urllib.request.build_opener()
 useragent = "Mozilla/5.0 (Linux; Android 11; SM-M017F Build/PPR1.180610.011; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/74.0.3729.157 Mobile Safari/537.36"
 opener.addheaders = [("User-agent", useragent)]
+
+
+def _search_web(query, page=1):
+    response = requests.get(
+        "https://html.duckduckgo.com/html/",
+        params={"q": query, "s": (page - 1) * 30},
+        headers={"User-Agent": useragent},
+        timeout=20,
+    )
+    response.raise_for_status()
+    soup = BeautifulSoup(response.text, "html.parser")
+    results = []
+    for item in soup.select(".result"):
+        link_tag = item.select_one("a.result__a")
+        if not link_tag:
+            continue
+        link = link_tag.get("href", "")
+        if link.startswith("//duckduckgo.com/l/?"):
+            link = urllib.parse.parse_qs(urllib.parse.urlparse(link).query).get(
+                "uddg", [link]
+            )[0]
+        description_tag = item.select_one(".result__snippet")
+        results.append(
+            {
+                "title": link_tag.get_text(" ", strip=True),
+                "link": link,
+                "description": description_tag.get_text(" ", strip=True)
+                if description_tag
+                else "",
+            }
+        )
+    return results
 
 
 @register(pattern="^/google (.*)")
@@ -34,31 +66,24 @@ async def _(event):
         match = match.replace(page_value, "").strip()
     except IndexError:
         page = 1
-    search_args = (str(match), int(page))
-    gsearch = GoogleSearch()
     try:
-        gresults = await gsearch.async_search(*search_args)
+        results = await asyncio.to_thread(_search_web, str(match), int(page))
     except Exception as exc:
-        LOGGER.warning("Google search failed: %s", exc)
+        LOGGER.warning("Web search failed: %s", exc)
         await webevent.edit(
-            "Google search is not available right now. Please try a different query later."
+            "Search is not available right now. Please try again later."
         )
         return
 
-    links = gresults.get("links", []) if isinstance(gresults, dict) else []
-    titles = gresults.get("titles", []) if isinstance(gresults, dict) else []
-    descriptions = gresults.get("descriptions", []) if isinstance(gresults, dict) else []
-
-    if not links:
+    if not results:
         await webevent.edit("No results found for this query.")
         return
 
     msg = ""
-    for i in range(min(len(links), len(titles), len(descriptions))):
-        title = titles[i]
-        link = links[i]
-        desc = descriptions[i]
-        msg += f"❍[{title}]({link})\n**{desc}**\n\n"
+    for result in results[:10]:
+        msg += "❍[{}]({})\n**{}**\n\n".format(
+            result["title"], result["link"], result["description"]
+        )
 
     await webevent.edit(
         "**Search Query:**\n`" + match + "`\n\n**Results:**\n" + msg, link_preview=False
@@ -121,11 +146,17 @@ async def okgoogle(img):
         image.close()
         # https://stackoverflow.com/questions/23270175/google-reverse-image-search-using-post-request#28792943
         searchUrl = "https://www.google.com/searchbyimage/upload"
-        multipart = {"encoded_image": (name, open(name, "rb")), "image_content": ""}
-        response = requests.post(searchUrl, files=multipart, allow_redirects=False)
-        fetchUrl = response.headers["Location"]
+        with open(name, "rb") as image_file:
+            multipart = {
+                "encoded_image": (name, image_file),
+                "image_content": "",
+            }
+            response = requests.post(
+                searchUrl, files=multipart, allow_redirects=False, timeout=30
+            )
+        fetchUrl = response.headers.get("Location")
 
-        if response != 400:
+        if response.ok and fetchUrl:
             await dev.edit(
                 "`Image successfully uploaded to Google. Maybe.`"
                 "\n`Parsing source now. Maybe.`"
@@ -134,7 +165,8 @@ async def okgoogle(img):
             await dev.edit("`Google told me to fu*k off.`")
             return
 
-        os.remove(name)
+        if os.path.exists(name):
+            os.remove(name)
         match = await ParseSauce(fetchUrl + "&preferences?hl=en&fg=1#languages")
         guess = match["best_guess"]
         imgspage = match["similar_images"]
