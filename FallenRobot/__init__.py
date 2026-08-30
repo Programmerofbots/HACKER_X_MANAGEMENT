@@ -4,7 +4,29 @@ import re
 import sys
 import threading
 import time
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+
+def _start_health_server():
+    port = int(os.environ.get("PORT", 10000))
+
+    class HealthHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"ok")
+
+        def log_message(self, format, *args):
+            return
+
+    server = ThreadingHTTPServer(("0.0.0.0", port), HealthHandler)
+    server.serve_forever()
+
+
+if os.environ.get("RENDER") or os.environ.get("PORT"):
+    health_thread = threading.Thread(target=_start_health_server, daemon=True)
+    health_thread.start()
 
 import telegram.ext as tg
 from aiohttp import ClientSession
@@ -192,27 +214,6 @@ pbot = Client("FallenRobot", api_id=API_ID, api_hash=API_HASH, bot_token=TOKEN)
 dispatcher = updater.dispatcher
 aiohttpsession = ClientSession()
 
-
-def _start_health_server():
-    port = int(os.environ.get("PORT", 10000))
-
-    class HealthHandler(BaseHTTPRequestHandler):
-        def do_GET(self):
-            self.send_response(200)
-            self.send_header("Content-type", "text/plain")
-            self.end_headers()
-            self.wfile.write(b"ok")
-
-        def log_message(self, format, *args):
-            return
-
-    server = HTTPServer(("0.0.0.0", port), HealthHandler)
-    server.serve_forever()
-
-
-if os.environ.get("RENDER") or os.environ.get("PORT"):
-    health_thread = threading.Thread(target=_start_health_server, daemon=True)
-    health_thread.start()
 
 print("[INFO]: Getting Bot Info...")
 BOT_ID = dispatcher.bot.id
