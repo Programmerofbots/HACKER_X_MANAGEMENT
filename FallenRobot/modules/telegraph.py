@@ -27,7 +27,13 @@ def _safe_telegraph_upload(file_path):
         with open(file_path, "rb") as media_file:
             response = requests.post(
                 "https://telegra.ph/upload",
-                files={"file": media_file},
+                files={
+                    "file": (
+                        os.path.basename(file_path),
+                        media_file,
+                        "application/octet-stream",
+                    )
+                },
                 timeout=60,
             )
         response.raise_for_status()
@@ -76,6 +82,20 @@ def _get_telegraph():
     return telegraph
 
 
+def _prepare_media_for_upload(file_path):
+    extension = os.path.splitext(file_path)[1].lower()
+    if extension in {".jpg", ".jpeg", ".png", ".gif"}:
+        return file_path
+
+    try:
+        with Image.open(file_path) as image:
+            upload_path = os.path.splitext(file_path)[0] + ".png"
+            image.convert("RGBA").save(upload_path, "PNG")
+    except Exception as exc:
+        raise RuntimeError("This media format cannot be uploaded to Telegraph") from exc
+    return upload_path
+
+
 @register(pattern="^/tg(m|t) ?(.*)")
 async def _(event):
     if event.fwd_from:
@@ -94,23 +114,32 @@ async def _(event):
             h = await event.reply(
                 "Downloaded to {} in {} seconds.".format(downloaded_file_name, ms)
             )
-            if downloaded_file_name.endswith((".webp")):
-                resize_image(downloaded_file_name)
             try:
+                upload_file_name = _prepare_media_for_upload(downloaded_file_name)
                 start = datetime.now()
                 media_url = await asyncio.to_thread(
-                    _safe_telegraph_upload, downloaded_file_name
+                    _safe_telegraph_upload, upload_file_name
                 )
             except Exception as exc:
                 LOGGER.warning("Telegraph file upload failed: %s", exc)
-                await h.edit("ERROR: Telegraph upload failed right now. Try again later.")
+                await h.edit(
+                    "ERROR: This media cannot be uploaded to Telegraph right now."
+                )
                 if os.path.exists(downloaded_file_name):
                     os.remove(downloaded_file_name)
+                if (
+                    "upload_file_name" in locals()
+                    and upload_file_name != downloaded_file_name
+                    and os.path.exists(upload_file_name)
+                ):
+                    os.remove(upload_file_name)
             else:
                 end = datetime.now()
                 (end - start).seconds
                 if os.path.exists(downloaded_file_name):
                     os.remove(downloaded_file_name)
+                if upload_file_name != downloaded_file_name and os.path.exists(upload_file_name):
+                    os.remove(upload_file_name)
                 await h.edit(
                     "Uploaded to {}".format(media_url),
                     link_preview=True,
