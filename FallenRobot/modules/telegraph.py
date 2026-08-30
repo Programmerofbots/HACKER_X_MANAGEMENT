@@ -1,8 +1,9 @@
 import os
+import asyncio
 from datetime import datetime
 
 from PIL import Image
-from telegraph import Telegraph, exceptions, upload_file
+from telegraph import Telegraph, upload_file
 
 from FallenRobot import LOGGER, telethn as tbot
 from FallenRobot.events import register
@@ -10,8 +11,14 @@ from FallenRobot.events import register
 Anonymous = "Fallen"
 TMP_DOWNLOAD_DIRECTORY = "./"
 telegraph = Telegraph()
-r = telegraph.create_account(short_name=Anonymous)
-auth_url = r["auth_url"]
+
+
+def _telegraph_url(path):
+    if not path:
+        raise RuntimeError("Telegraph upload returned an empty response")
+    if path.startswith("http://") or path.startswith("https://"):
+        return path
+    return "https://telegra.ph/" + path.lstrip("/")
 
 
 def _safe_telegraph_upload(file_path):
@@ -25,17 +32,40 @@ def _safe_telegraph_upload(file_path):
         if "error" in result:
             raise RuntimeError(result.get("error", "Telegraph upload failed"))
         if "src" in result:
-            return [result["src"]]
+            return _telegraph_url(result["src"])
         if "url" in result:
-            return [result["url"]]
+            return _telegraph_url(result["url"])
 
     if isinstance(result, str):
-        return [result]
+        return _telegraph_url(result)
 
     if isinstance(result, (list, tuple)):
-        return list(result)
+        if not result:
+            raise RuntimeError("Telegraph upload returned an empty response")
+        first_result = result[0]
+        if isinstance(first_result, dict):
+            return _safe_telegraph_upload_result(first_result)
+        if isinstance(first_result, str):
+            return _telegraph_url(first_result)
 
     raise RuntimeError("Telegraph upload returned an unexpected response format")
+
+
+def _safe_telegraph_upload_result(result):
+    if "error" in result:
+        raise RuntimeError(result.get("error", "Telegraph upload failed"))
+    if "src" in result:
+        return _telegraph_url(result["src"])
+    if "url" in result:
+        return _telegraph_url(result["url"])
+    raise RuntimeError("Telegraph upload returned an unexpected response format")
+
+
+def _get_telegraph():
+    if not telegraph.access_token:
+        account = telegraph.create_account(short_name=Anonymous)
+        telegraph.access_token = account["access_token"]
+    return telegraph
 
 
 @register(pattern="^/tg(m|t) ?(.*)")
@@ -60,7 +90,9 @@ async def _(event):
                 resize_image(downloaded_file_name)
             try:
                 start = datetime.now()
-                media_urls = _safe_telegraph_upload(downloaded_file_name)
+                media_url = await asyncio.to_thread(
+                    _safe_telegraph_upload, downloaded_file_name
+                )
             except Exception as exc:
                 LOGGER.warning("Telegraph file upload failed: %s", exc)
                 await h.edit("ERROR: Telegraph upload failed right now. Try again later.")
@@ -72,7 +104,7 @@ async def _(event):
                 if os.path.exists(downloaded_file_name):
                     os.remove(downloaded_file_name)
                 await h.edit(
-                    "Uploaded to {}".format(media_urls[0]),
+                    "Uploaded to {}".format(media_url),
                     link_preview=True,
                 )
         elif input_str == "t":
@@ -95,7 +127,9 @@ async def _(event):
                     page_content += m.decode("UTF-8") + "\n"
                 os.remove(downloaded_file_name)
             page_content = page_content.replace("\n", "<br>")
-            response = telegraph.create_page(title_of_page, html_content=page_content)
+            response = _get_telegraph().create_page(
+                title_of_page, html_content=page_content
+            )
             end = datetime.now()
             ms = (end - start).seconds
             await event.reply(
