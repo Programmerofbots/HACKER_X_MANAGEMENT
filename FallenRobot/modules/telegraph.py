@@ -1,5 +1,6 @@
 import os
 import asyncio
+import tempfile
 from datetime import datetime
 
 from PIL import Image
@@ -91,8 +92,21 @@ def _get_telegraph():
 def _prepare_media_for_upload(file_path):
     try:
         with Image.open(file_path) as image:
-            upload_path = os.path.splitext(file_path)[0] + ".png"
-            image.convert("RGBA").save(upload_path, "PNG")
+            image.seek(0)
+            if image.mode in ("RGBA", "LA", "P"):
+                image = image.convert("RGBA")
+                background = Image.new("RGB", image.size, "white")
+                background.paste(image, mask=image.getchannel("A"))
+                image = background
+            else:
+                image = image.convert("RGB")
+            max_size = 2000
+            image.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+            file_handle, upload_path = tempfile.mkstemp(
+                suffix=".jpg", prefix="telegraph_upload_"
+            )
+            os.close(file_handle)
+            image.save(upload_path, "JPEG", quality=85, optimize=True)
     except Exception as exc:
         raise RuntimeError("This media format cannot be uploaded to Telegraph") from exc
     return upload_path
