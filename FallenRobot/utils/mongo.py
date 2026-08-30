@@ -5,10 +5,10 @@ from motor.motor_asyncio import AsyncIOMotorClient as MongoCli
 from FallenRobot import MONGO_DB_URI
 
 mongo = MongoCli(MONGO_DB_URI) if MONGO_DB_URI else None
-db = mongo.FallenRobot if mongo else None
+db = mongo.FallenRobot if mongo is not None else None
 
-coupledb = db.couple if db else None
-karmadb = db.karma if db else None
+coupledb = db.couple if db is not None else None
+karmadb = db.karma if db is not None else None
 
 
 async def _get_lovers(chat_id: int):
