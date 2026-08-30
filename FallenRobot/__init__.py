@@ -56,7 +56,13 @@ ENV = _env_bool("ENV", False) or bool(os.environ.get("TOKEN", "").strip())
 
 if ENV:
 
-    API_ID = int(os.environ.get("API_ID", None))
+    API_ID = os.environ.get("API_ID")
+    if API_ID is None or not str(API_ID).strip():
+        raise RuntimeError(
+            "API_ID is empty. On Render, set ENV=True and add your Telegram API_ID."
+        )
+    API_ID = int(API_ID)
+
     API_HASH = _env_required("API_HASH")
     ALLOW_CHATS = _env_bool("ALLOW_CHATS", True)
     ALLOW_EXCL = _env_bool("ALLOW_EXCL", False)

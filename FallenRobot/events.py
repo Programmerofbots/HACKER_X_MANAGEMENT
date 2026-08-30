@@ -7,10 +7,20 @@ from telethon import events
 
 from FallenRobot import MONGO_DB_URI, telethn
 
-client = MongoClient()
-client = MongoClient(MONGO_DB_URI)
-db = client["Anonymous"]
-gbanned = db.gban
+client = None
+db = None
+gbanned = None
+
+if MONGO_DB_URI:
+    try:
+        client = MongoClient(MONGO_DB_URI)
+        db = client["Anonymous"]
+        gbanned = db.gban
+    except Exception as exc:
+        print(f"MongoDB connection failed: {exc}")
+        client = None
+        db = None
+        gbanned = None
 
 
 def register(**args):
