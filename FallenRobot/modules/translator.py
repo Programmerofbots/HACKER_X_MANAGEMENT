@@ -1,4 +1,5 @@
 from gpytranslate import SyncTranslator
+from gpytranslate.exceptions import TranslationError
 from telegram import ParseMode, Update
 from telegram.ext import CallbackContext
 
@@ -26,17 +27,23 @@ def totranslate(update: Update, context: CallbackContext) -> None:
     elif reply_msg.text:
         to_translate = reply_msg.text
     try:
-        args = message.text.split()[1].lower()
-        if "//" in args:
-            source = args.split("//")[0]
-            dest = args.split("//")[1]
-        else:
+        try:
+            args = message.text.split()[1].lower()
+            if "//" in args:
+                source = args.split("//")[0]
+                dest = args.split("//")[1]
+            else:
+                source = trans.detect(to_translate)
+                dest = args
+        except IndexError:
             source = trans.detect(to_translate)
-            dest = args
-    except IndexError:
-        source = trans.detect(to_translate)
-        dest = "en"
-    translation = trans(to_translate, sourcelang=source, targetlang=dest)
+            dest = "en"
+        translation = trans(to_translate, sourcelang=source, targetlang=dest)
+    except TranslationError:
+        message.reply_text(
+            "Translation is temporarily unavailable. Please try again later."
+        )
+        return
     reply = (
         f"<b>ᴛʀᴀɴsʟᴀᴛᴇᴅ ғʀᴏᴍ {source} ᴛᴏ {dest}</b> :\n"
         f"<code>{translation.text}</code>"
