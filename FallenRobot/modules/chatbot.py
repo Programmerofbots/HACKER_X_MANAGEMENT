@@ -138,13 +138,19 @@ def chatbot(update: Update, context: CallbackContext):
         if not api_key:
             message.reply_text("Chatbot is not configured yet. Add OPENAI_API_KEY in Render.")
             return
-        url = "https://api.openai.com/v1/responses"
+        url = "https://api.openai.com/v1/chat/completions"
         payload = {
             "model": "gpt-4o-mini",
-            "input": "You are {}. Reply briefly and helpfully to this message: {}".format(
-                BOT_NAME, message.text
-            ),
-            "max_output_tokens": 300,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are {}. Reply briefly and helpfully.".format(
+                        BOT_NAME
+                    ),
+                },
+                {"role": "user", "content": message.text},
+            ],
+            "max_tokens": 300,
         }
         try:
             request = requests.post(
@@ -158,18 +164,25 @@ def chatbot(update: Update, context: CallbackContext):
             )
             request.raise_for_status()
             results = request.json()
-            reply = results.get("output_text") if isinstance(results, dict) else None
-            if not reply and isinstance(results, dict):
-                output = results.get("output", [])
-                if output and output[0].get("content"):
-                    reply = output[0]["content"][0].get("text")
+            reply = None
+            if isinstance(results, dict):
+                choices = results.get("choices", [])
+                if choices:
+                    reply = choices[0].get("message", {}).get("content")
             if not reply or not isinstance(reply, str):
                 raise ValueError("invalid chatbot response")
 
             message.reply_text(reply)
         except requests.HTTPError as exc:
-            if exc.response is not None and exc.response.status_code in (401, 403):
+            status_code = exc.response.status_code if exc.response is not None else 0
+            error_body = exc.response.text[:500] if exc.response is not None else ""
+            LOGGER.warning("OpenAI chatbot HTTP %s: %s", status_code, error_body)
+            if status_code in (401, 403):
                 message.reply_text("OpenAI API key is invalid or not active in Render.")
+            elif status_code == 429:
+                message.reply_text("OpenAI quota or rate limit reached. Check billing and try again later.")
+            elif status_code == 400:
+                message.reply_text("OpenAI rejected the chatbot request. Check the model and API key project settings.")
             else:
                 message.reply_text("OpenAI chatbot is temporarily unavailable. Please try again later.")
         except (requests.RequestException, ValueError, TypeError, KeyError):
