@@ -29,9 +29,9 @@ async def _(event):
     match = event.pattern_match.group(1)
     page = re.findall(r"page=\d+", match)
     try:
-        page = page[0]
-        page = page.replace("page=", "")
-        match = match.replace("page=" + page[0], "")
+        page_value = page[0]
+        page = page_value.replace("page=", "")
+        match = match.replace(page_value, "").strip()
     except IndexError:
         page = 1
     search_args = (str(match), int(page))

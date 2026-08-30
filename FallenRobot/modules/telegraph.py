@@ -29,14 +29,20 @@ def _safe_telegraph_upload(file_path):
                 "https://telegra.ph/upload",
                 files={
                     "file": (
-                        os.path.basename(file_path),
+                        "image.png",
                         media_file,
-                        "application/octet-stream",
+                        "image/png",
                     )
                 },
+                headers={"User-Agent": "Mozilla/5.0"},
                 timeout=60,
             )
-        response.raise_for_status()
+        if not response.ok:
+            raise RuntimeError(
+                "Telegraph returned HTTP {}: {}".format(
+                    response.status_code, response.text[:300]
+                )
+            )
         result = response.json()
     except Exception as exc:
         LOGGER.warning("Telegraph upload failed: %s", exc)
@@ -83,10 +89,6 @@ def _get_telegraph():
 
 
 def _prepare_media_for_upload(file_path):
-    extension = os.path.splitext(file_path)[1].lower()
-    if extension in {".jpg", ".jpeg", ".png", ".gif"}:
-        return file_path
-
     try:
         with Image.open(file_path) as image:
             upload_path = os.path.splitext(file_path)[0] + ".png"
