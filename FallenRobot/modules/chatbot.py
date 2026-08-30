@@ -1,8 +1,8 @@
 import html
 import json
+import os
 import re
 from typing import Optional
-from urllib.parse import quote
 
 import requests
 from telegram import (
@@ -134,31 +134,46 @@ def chatbot(update: Update, context: CallbackContext):
         if not fallen_message(context, message):
             return
         bot.send_chat_action(chat_id, action="typing")
-        url = (
-            "https://kora-api.vercel.app/chatbot/"
-            f"2d94e37d-937f-4d28-9196-bd5552cac68b/{quote(BOT_NAME)}/Anonymous/"
-            f"message={quote(message.text)}"
-        )
+        api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+        if not api_key:
+            message.reply_text("Chatbot is not configured yet. Add OPENAI_API_KEY in Render.")
+            return
+        url = "https://api.openai.com/v1/responses"
+        payload = {
+            "model": "gpt-4o-mini",
+            "input": "You are {}. Reply briefly and helpfully to this message: {}".format(
+                BOT_NAME, message.text
+            ),
+            "max_output_tokens": 300,
+        }
         try:
-            request = requests.get(url, timeout=10)
+            request = requests.post(
+                url,
+                headers={
+                    "Authorization": "Bearer " + api_key,
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+                timeout=30,
+            )
             request.raise_for_status()
-            if not request.text:
-                raise ValueError("empty chatbot response")
-
-            try:
-                results = request.json()
-            except ValueError:
-                results = {}
-
-            reply = None
-            if isinstance(results, dict):
-                reply = results.get("reply") or results.get("response")
+            results = request.json()
+            reply = results.get("output_text") if isinstance(results, dict) else None
+            if not reply and isinstance(results, dict):
+                output = results.get("output", [])
+                if output and output[0].get("content"):
+                    reply = output[0]["content"][0].get("text")
             if not reply or not isinstance(reply, str):
                 raise ValueError("invalid chatbot response")
 
             message.reply_text(reply)
+        except requests.HTTPError as exc:
+            if exc.response is not None and exc.response.status_code in (401, 403):
+                message.reply_text("OpenAI API key is invalid or not active in Render.")
+            else:
+                message.reply_text("OpenAI chatbot is temporarily unavailable. Please try again later.")
         except (requests.RequestException, ValueError, TypeError, KeyError):
-            message.reply_text("I’m having trouble replying right now. Please try again in a moment.")
+            message.reply_text("OpenAI chatbot is temporarily unavailable. Please try again later.")
 
 
 __help__ = f"""
